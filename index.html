@@ -10,6 +10,54 @@
     href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js"></script>
+  <script>
+    // ── Anti-inspection shield ──────────────────────────────────────────────
+    (function(){
+      'use strict';
+
+      // 1. Disable right-click context menu
+      document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+      // 2. Block devtools keyboard shortcuts
+      document.addEventListener('keydown', function(e){
+        // F12
+        if(e.key === 'F12' || e.keyCode === 123){ e.preventDefault(); return false; }
+        // Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C
+        if(e.ctrlKey && e.shiftKey && (e.key==='I'||e.key==='i'||e.key==='J'||e.key==='j'||e.key==='C'||e.key==='c')){ e.preventDefault(); return false; }
+        // Ctrl+U (view source)
+        if(e.ctrlKey && (e.key==='U'||e.key==='u')){ e.preventDefault(); return false; }
+        // Ctrl+S (save)
+        if(e.ctrlKey && (e.key==='S'||e.key==='s')){ e.preventDefault(); return false; }
+      }, true);
+
+      // 3. DevTools size-based detection (outer vs inner window gap)
+      var _dt = false;
+      function _dtCheck(){
+        var threshold = 160;
+        if((window.outerWidth - window.innerWidth) > threshold ||
+           (window.outerHeight - window.innerHeight) > threshold){
+          if(!_dt){ _dt=true; _shield(); }
+        } else {
+          _dt = false;
+        }
+      }
+      setInterval(_dtCheck, 1000);
+
+      // 4. debugger trap – slows down anyone who opens console
+      var _dbg = function(){
+        var _s = new Date();
+        debugger;
+        if(new Date() - _s > 100){ _shield(); }
+      };
+      setInterval(_dbg, 3000);
+
+      // 5. When detected – wipe the visible page content
+      function _shield(){
+        document.documentElement.innerHTML =
+          '<body style="background:#000;color:#333;display:flex;align-items:center;justify-content:center;height:100vh;font-family:monospace;font-size:14px;">ACCESS DENIED</body>';
+      }
+    })();
+  </script>
   <style>
     :root {
       --bg: #0a0b0d;
