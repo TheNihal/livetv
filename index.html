@@ -548,10 +548,10 @@
             ">🔊 Tap to Unmute</div>
           </div>
         </div>
-        <!-- <div class="tv-controls">
+        <div class="tv-controls">
           <button class="btn ghost" id="demoBtn">Try a demo stream</button>
           <button class="btn ghost" id="fullscreenBtn" style="margin-left:8px;">Fullscreen</button>
-        </div> -->
+        </div>
       </div>
     </div>
 
@@ -1054,12 +1054,12 @@
         showOverlay('idle');
       });
 
-      demoBtn.addEventListener('click', function () {
+      if (demoBtn) demoBtn.addEventListener('click', function () {
         urlInput.value = DEMO_URL;
         loadPlaylistOrStream(DEMO_URL);
       });
 
-      fullscreenBtn.addEventListener('click', function () {
+      if (fullscreenBtn) fullscreenBtn.addEventListener('click', function () {
         if (video.requestFullscreen) video.requestFullscreen();
         else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
       });
