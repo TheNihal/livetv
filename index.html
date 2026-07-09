@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tuner — IPTV Player</title>
+  <title>TumpaTV — IPTV Player</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
     href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap"
@@ -481,8 +481,17 @@
     }
 
     @keyframes pulse {
-      0%,100% { transform: scale(1); opacity:1; }
-      50% { transform: scale(1.05); opacity:0.85; }
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(1.05);
+        opacity: 0.85;
+      }
     }
 
     @media (max-width:720px) {
@@ -802,7 +811,7 @@
               video.play().then(() => {
                 // Show unmute button so user can tap once to restore sound
                 if (unmuteBtn) unmuteBtn.style.display = 'flex';
-              }).catch(() => {});
+              }).catch(() => { });
             }
           });
         }
