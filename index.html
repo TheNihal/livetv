@@ -480,6 +480,11 @@
       line-height: 1.6;
     }
 
+    @keyframes pulse {
+      0%,100% { transform: scale(1); opacity:1; }
+      50% { transform: scale(1.05); opacity:0.85; }
+    }
+
     @media (max-width:720px) {
       body {
         padding: 16px;
@@ -518,6 +523,20 @@
           <div class="overlay" id="overlay">
             <div class="glyph" id="overlayGlyph">NO SIGNAL</div>
             <div class="msg" id="overlayMsg">Paste a stream link or playlist on the right to get started.</div>
+          </div>
+          <div id="unmuteBtn" style="
+            display:none;position:absolute;inset:0;
+            display:none;align-items:center;justify-content:center;
+            z-index:20;background:rgba(0,0,0,0.45);cursor:pointer;
+          ">
+            <div style="
+              background:rgba(255,180,84,0.92);color:#111;
+              border-radius:50px;padding:16px 32px;
+              font-size:20px;font-weight:800;letter-spacing:1px;
+              display:flex;align-items:center;gap:10px;
+              box-shadow:0 4px 30px rgba(0,0,0,0.5);
+              animation:pulse 1.4s infinite;
+            ">🔊 Tap to Unmute</div>
           </div>
         </div>
         <div class="tv-controls">
@@ -772,17 +791,28 @@
         return 'Playback failed for this stream.';
       }
 
+      const unmuteBtn = document.getElementById('unmuteBtn');
+
       function safePlay() {
         const playPromise = video.play();
         if (playPromise !== undefined) {
           playPromise.catch(e => {
             if (e.name === 'NotAllowedError') {
-              // Browser blocked autoplay (needs user interaction or mute)
               video.muted = true;
-              video.play().catch(() => {});
+              video.play().then(() => {
+                // Show unmute button so user can tap once to restore sound
+                if (unmuteBtn) unmuteBtn.style.display = 'flex';
+              }).catch(() => {});
             }
           });
         }
+      }
+
+      if (unmuteBtn) {
+        unmuteBtn.addEventListener('click', () => {
+          video.muted = false;
+          unmuteBtn.style.display = 'none';
+        });
       }
 
       function loadIntoPlayer(url, fallbackEngine = null) {
