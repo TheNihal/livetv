@@ -535,7 +535,8 @@
         </div>
 
         <div class="field" style="margin-bottom: 10px;">
-          <select id="engineSelect" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: var(--fg); border-radius: 6px; font-size: 13px;">
+          <select id="engineSelect"
+            style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: var(--fg); border-radius: 6px; font-size: 13px;">
             <option value="native" selected>Engine: Native TV / Safari (Bypasses CORS)</option>
             <option value="auto">Engine: Auto (HLS.js preferred)</option>
             <option value="hlsjs">Engine: HLS.js (Requires CORS proxy)</option>
@@ -543,7 +544,8 @@
         </div>
 
         <!-- Proxy mode indicator + manual override -->
-        <div id="proxyStatusBar" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
+        <div id="proxyStatusBar"
+          style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
           <span id="proxyStatusPill" style="
             display:inline-flex;align-items:center;gap:6px;
             background:rgba(255,180,84,0.08);border:1px solid rgba(255,180,84,0.2);
@@ -574,15 +576,7 @@
           <button class="btn primary" id="loadBtn">Load</button>
           <button class="btn ghost" id="clearBtn">Clear</button>
         </div>
-        <button class="toggle-raw" id="toggleRaw">+ Paste raw M3U playlist text instead</button>
-        <div class="raw-block" id="rawBlock">
-          <textarea id="rawInput" placeholder="#EXTM3U
-#EXTINF:-1 group-title=&quot;Sports&quot;,Channel One
-https://example.com/channel1.m3u8"></textarea>
-          <div class="row-actions">
-            <button class="btn primary" id="parseBtn">Parse playlist</button>
-          </div>
-        </div>
+
         <div class="hint">
           Tip: bookmark this page with <code>?playlist=YOUR_M3U_URL</code> appended to the address and it will auto-load
           your channels every time — handy for a TV browser home-screen shortcut.
@@ -608,10 +602,6 @@ https://example.com/channel1.m3u8"></textarea>
       const clearBtn = document.getElementById('clearBtn');
       const demoBtn = document.getElementById('demoBtn');
       const fullscreenBtn = document.getElementById('fullscreenBtn');
-      const toggleRaw = document.getElementById('toggleRaw');
-      const rawBlock = document.getElementById('rawBlock');
-      const rawInput = document.getElementById('rawInput');
-      const parseBtn = document.getElementById('parseBtn');
       const channelListEl = document.getElementById('channelList');
       const proxySelect = document.getElementById('proxySelect');
       const customProxyInput = document.getElementById('customProxyInput');
@@ -629,7 +619,7 @@ https://example.com/channel1.m3u8"></textarea>
       const readoutName = document.getElementById('readoutName');
       const readoutGroup = document.getElementById('readoutGroup');
 
-      const DEMO_URL = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
+      const DEMO_URL = 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8';
 
       let channels = [];
       let currentIndex = -1;
@@ -947,12 +937,21 @@ https://example.com/channel1.m3u8"></textarea>
               group: groupMatch ? groupMatch[1] : ''
             };
           } else if (!line.startsWith('#')) {
-            if (pending) {
-              result.push({ name: pending.name, group: pending.group, url: line });
-              pending = null;
-            } else {
-              result.push({ name: 'Channel ' + (result.length + 1), group: '', url: line });
+            let parsedUrl = line;
+            let parsedName = pending ? pending.name : ('Channel ' + (result.length + 1));
+            let parsedGroup = pending ? pending.group : '';
+
+            const spaceIdx = line.indexOf(' ');
+            if (spaceIdx > 0) {
+              parsedUrl = line.substring(0, spaceIdx).trim();
+              const inlineName = line.substring(spaceIdx + 1).trim();
+              if (inlineName && !pending) {
+                parsedName = inlineName;
+              }
             }
+
+            result.push({ name: parsedName, group: parsedGroup, url: parsedUrl });
+            pending = null;
           }
         }
         return result;
@@ -1001,22 +1000,7 @@ https://example.com/channel1.m3u8"></textarea>
         else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
       });
 
-      toggleRaw.addEventListener('click', function () {
-        const open = rawBlock.classList.toggle('open');
-        toggleRaw.textContent = (open ? '− Hide' : '+ Paste') + ' raw M3U playlist text instead';
-      });
 
-      parseBtn.addEventListener('click', function () {
-        const text = rawInput.value;
-        if (!text.trim()) return;
-        const parsed = parseM3U(text);
-        if (parsed.length > 0) {
-          setChannels(parsed);
-          playChannel(0);
-        } else {
-          showOverlay('error', 'Could not find any stream links in that text.');
-        }
-      });
 
       // Arrow-key navigation for TV remotes / keyboards within the channel list
       channelListEl.addEventListener('keydown', function (e) {
@@ -1030,14 +1014,35 @@ https://example.com/channel1.m3u8"></textarea>
         items[next].focus();
       });
 
-      // Auto-load from ?playlist= or ?url= query param — useful for a saved TV bookmark
+      // Auto-load from ?playlist= or ?url= query param, OR try fetching iptv.txt from the same directory
       const params = new URLSearchParams(location.search);
       const auto = params.get('playlist') || params.get('url');
       if (auto) {
         urlInput.value = auto;
         loadPlaylistOrStream(auto);
       } else {
-        showOverlay('idle');
+        // Fetch iptv.txt automatically
+        fetch('iptv.txt')
+          .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.text();
+          })
+          .then(text => {
+            const parsed = parseM3U(text);
+            if (parsed.length > 0) {
+              setChannels(parsed);
+              playChannel(0);
+            } else {
+              showOverlay('idle', 'iptv.txt was found but no valid URLs were detected inside it.');
+            }
+          })
+          .catch(err => {
+            const isLocal = location.protocol === 'file:';
+            const msg = isLocal
+              ? 'Cannot auto-load iptv.txt because you opened this file directly from your computer (file://). Browsers block this for security. Please use a local server or paste the link manually.'
+              : 'Failed to auto-load iptv.txt (' + err.message + '). Check that the file exists on the server.';
+            showOverlay('error', msg);
+          });
       }
     })();
   </script>
