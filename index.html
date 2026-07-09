@@ -1078,15 +1078,14 @@
         items[next].focus();
       });
 
-      // Auto-load from ?playlist= or ?url= query param, OR try fetching iptv.txt from the same directory
+      // Auto-load from ?playlist= or ?url= query param, OR fetch playlist from server
       const params = new URLSearchParams(location.search);
       const auto = params.get('playlist') || params.get('url');
       if (auto) {
         urlInput.value = auto;
         loadPlaylistOrStream(auto);
       } else {
-        // Fetch iptv.txt automatically
-        fetch('iptv.txt')
+        fetch('/api/ch')
           .then(res => {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             return res.text();
@@ -1097,15 +1096,11 @@
               setChannels(parsed);
               playChannel(0);
             } else {
-              showOverlay('idle', 'iptv.txt was found but no valid URLs were detected inside it.');
+              showOverlay('idle');
             }
           })
-          .catch(err => {
-            const isLocal = location.protocol === 'file:';
-            const msg = isLocal
-              ? 'Cannot auto-load iptv.txt because you opened this file directly from your computer (file://). Browsers block this for security. Please use a local server or paste the link manually.'
-              : 'Failed to auto-load iptv.txt (' + err.message + '). Check that the file exists on the server.';
-            showOverlay('error', msg);
+          .catch(() => {
+            showOverlay('idle');
           });
       }
     })();
