@@ -772,7 +772,20 @@
         return 'Playback failed for this stream.';
       }
 
-      function loadIntoPlayer(url) {
+      function safePlay() {
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(e => {
+            if (e.name === 'NotAllowedError') {
+              // Browser blocked autoplay (needs user interaction or mute)
+              video.muted = true;
+              video.play().catch(() => {});
+            }
+          });
+        }
+      }
+
+      function loadIntoPlayer(url, fallbackEngine = null) {
         destroyHls();
 
         showOverlay("loading");
@@ -781,7 +794,7 @@
         video.removeAttribute("src");
         video.load();
 
-        const engine = engineSelect ? engineSelect.value : 'auto';
+        const engine = fallbackEngine || (engineSelect ? engineSelect.value : 'auto');
         const canNative = video.canPlayType("application/vnd.apple.mpegurl") || video.canPlayType("application/x-mpegurl");
         const canHlsJs = window.Hls && Hls.isSupported();
 
@@ -808,7 +821,7 @@
 
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
             hideOverlay();
-            video.play().catch(() => { });
+            safePlay();
           });
 
           hls.on(Hls.Events.ERROR, (event, data) => {
@@ -822,7 +835,11 @@
                     data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
                     data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR) {
                     destroyHls();
-                    showOverlay("error", describeHlsError(data));
+                    if (!fallbackEngine && canNative) {
+                      loadIntoPlayer(url, 'native');
+                    } else {
+                      showOverlay("error", describeHlsError(data));
+                    }
                   } else {
                     hls.startLoad();
                   }
@@ -834,7 +851,11 @@
 
                 default:
                   destroyHls();
-                  showOverlay("error", describeHlsError(data));
+                  if (!fallbackEngine && canNative) {
+                    loadIntoPlayer(url, 'native');
+                  } else {
+                    showOverlay("error", describeHlsError(data));
+                  }
                   break;
               }
             }
@@ -847,11 +868,15 @@
 
           video.onloadedmetadata = () => {
             hideOverlay();
-            video.play().catch(() => { });
+            safePlay();
           };
 
           video.onerror = () => {
-            showOverlay("error", "Native playback failed. The stream might be offline or unsupported.");
+            if (!fallbackEngine && canHlsJs) {
+              loadIntoPlayer(url, 'hlsjs');
+            } else {
+              showOverlay("error", "Native playback failed. The stream might be offline or unsupported.");
+            }
           };
 
         } else {
