@@ -1,80 +1,724 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hello, Deno</title>
-  <link rel="preload" href="https://demo-styles.deno.deno.net/fonts/Moranga-Regular.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="https://demo-styles.deno.deno.net/fonts/Moranga-Medium.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="https://demo-styles.deno.deno.net/fonts/Recursive_Variable.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="https://demo-styles.deno.deno.net/styles.css">
-  <style>
-    img {
-      display: inline-block;
-      vertical-align: middle;
-    }
-  </style>
-</head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tuner — IPTV Player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0b0d;
+    --bezel:#15171b;
+    --bezel-edge:#1f2226;
+    --panel:#121316;
+    --border:#232630;
+    --text:#f2f0eb;
+    --muted:#9aa0a6;
+    --amber:#ffb454;
+    --amber-dim:#8a5f2c;
+    --live:#ff4d4d;
+    --focus:#ffb454;
+    --mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    --sans:"Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+    padding:28px;
+  }
+  a{color:var(--amber);}
 
+  /* ---------- Header ---------- */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:24px;
+    flex-wrap:wrap;
+    margin-bottom:20px;
+  }
+  .wordmark{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .wordmark .mark{
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:20px;
+    letter-spacing:2px;
+    color:var(--text);
+  }
+  .wordmark .mark::before{
+    content:"◉ ";
+    color:var(--amber);
+  }
+  .wordmark .sub{
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:1px;
+  }
+
+  .readout{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:10px 18px;
+    min-width:260px;
+  }
+  .readout .num{
+    font-family:var(--mono);
+    font-size:32px;
+    font-weight:700;
+    color:var(--amber);
+    text-shadow:0 0 10px rgba(255,180,84,0.55), 0 0 2px rgba(255,180,84,0.8);
+    letter-spacing:1px;
+    min-width:56px;
+  }
+  .readout .info{
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .readout .name{
+    font-size:14px;
+    font-weight:600;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:220px;
+  }
+  .readout .group{
+    font-size:11px;
+    color:var(--muted);
+  }
+  .readout.flicker .num{
+    animation:flicker 420ms ease-out;
+  }
+  @keyframes flicker{
+    0%{opacity:0.15; text-shadow:none;}
+    15%{opacity:1; text-shadow:0 0 14px rgba(255,180,84,0.8);}
+    30%{opacity:0.3;}
+    45%{opacity:1;}
+    100%{opacity:1; text-shadow:0 0 10px rgba(255,180,84,0.55);}
+  }
+
+  /* ---------- Layout ---------- */
+  .layout{
+    display:flex;
+    gap:22px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+  }
+  .screen-col{
+    flex:2 1 560px;
+    min-width:320px;
+  }
+  .side-col{
+    flex:1 1 320px;
+    min-width:300px;
+  }
+
+  /* ---------- TV bezel / screen ---------- */
+  .tv{
+    background:var(--bezel);
+    border:1px solid var(--bezel-edge);
+    border-radius:16px;
+    padding:14px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .screen{
+    position:relative;
+    width:100%;
+    aspect-ratio:16/9;
+    background:#000;
+    border-radius:8px;
+    overflow:hidden;
+  }
+  .screen video{
+    width:100%;
+    height:100%;
+    display:block;
+    background:#000;
+  }
+  .live-badge{
+    position:absolute;
+    top:10px;
+    left:10px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background:rgba(0,0,0,0.55);
+    border:1px solid rgba(255,255,255,0.12);
+    padding:4px 9px;
+    border-radius:20px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:1px;
+    z-index:3;
+    pointer-events:none;
+    transition:opacity 150ms ease;
+  }
+  .live-badge .dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--live);
+    box-shadow:0 0 8px rgba(255,77,77,0.9);
+  }
+  .live-badge.hidden{opacity:0;}
+
+  .overlay{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap:10px;
+    text-align:center;
+    padding:24px;
+    z-index:2;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 3px),
+      #050506;
+    transition:opacity 200ms ease;
+  }
+  .overlay.hidden{ opacity:0; pointer-events:none; }
+  .overlay .glyph{
+    font-family:var(--mono);
+    font-size:13px;
+    letter-spacing:3px;
+    color:var(--muted);
+    text-transform:uppercase;
+  }
+  .overlay .msg{
+    font-size:14px;
+    color:var(--text);
+    max-width:420px;
+    line-height:1.5;
+  }
+  .overlay.state-error .glyph{ color:var(--live); }
+  .overlay .spinner{
+    width:22px;height:22px;
+    border-radius:50%;
+    border:2px solid rgba(255,180,84,0.25);
+    border-top-color:var(--amber);
+    animation:spin 900ms linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+
+  .tv-controls{
+    display:flex;
+    justify-content:flex-end;
+    margin-top:10px;
+  }
+  button{
+    font-family:var(--sans);
+    cursor:pointer;
+  }
+  .btn{
+    background:var(--panel);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 14px;
+    border-radius:8px;
+    font-size:13px;
+    font-weight:600;
+  }
+  .btn:hover{ border-color:var(--amber-dim); }
+  .btn.primary{
+    background:var(--amber);
+    color:#231705;
+    border-color:var(--amber);
+  }
+  .btn.primary:hover{ filter:brightness(1.05); }
+  .btn.ghost{
+    background:transparent;
+  }
+  button:focus-visible, .channel-item:focus-visible, input:focus-visible, textarea:focus-visible{
+    outline:3px solid var(--focus);
+    outline-offset:2px;
+  }
+
+  /* ---------- Side panel ---------- */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:18px;
+    margin-bottom:16px;
+  }
+  .panel h2{
+    font-size:12px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:0 0 12px 0;
+  }
+  .field{
+    display:flex;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  input[type="text"], textarea{
+    flex:1;
+    background:#0d0e11;
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:10px 12px;
+    border-radius:8px;
+    font-size:13px;
+    font-family:var(--sans);
+  }
+  textarea{
+    width:100%;
+    min-height:90px;
+    resize:vertical;
+    font-family:var(--mono);
+    font-size:12px;
+  }
+  .hint{
+    font-size:11.5px;
+    color:var(--muted);
+    line-height:1.5;
+    margin-top:2px;
+  }
+  .toggle-raw{
+    background:none;
+    border:none;
+    color:var(--amber);
+    font-size:12px;
+    font-weight:600;
+    padding:0;
+    margin-top:6px;
+  }
+  .raw-block{ margin-top:10px; display:none; }
+  .raw-block.open{ display:block; }
+  .row-actions{
+    display:flex;
+    gap:8px;
+    margin-top:8px;
+  }
+
+  /* ---------- Channel list ---------- */
+  .channel-list{
+    list-style:none;
+    margin:0; padding:0;
+    max-height:420px;
+    overflow-y:auto;
+  }
+  .channel-item{
+    width:100%;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:transparent;
+    border:1px solid transparent;
+    border-radius:8px;
+    padding:9px 10px;
+    text-align:left;
+    color:var(--text);
+    margin-bottom:4px;
+  }
+  .channel-item:hover{ background:rgba(255,255,255,0.04); }
+  .channel-item.active{
+    background:rgba(255,180,84,0.1);
+    border-color:rgba(255,180,84,0.35);
+  }
+  .channel-item .ch-num{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--muted);
+    width:26px;
+    flex-shrink:0;
+  }
+  .channel-item.active .ch-num{ color:var(--amber); }
+  .channel-item .ch-name{
+    font-size:13.5px;
+    font-weight:600;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    flex:1;
+  }
+  .channel-item .ch-group{
+    font-size:10px;
+    color:var(--muted);
+    background:rgba(255,255,255,0.06);
+    padding:2px 7px;
+    border-radius:10px;
+    flex-shrink:0;
+  }
+  .empty-state{
+    color:var(--muted);
+    font-size:13px;
+    padding:14px 4px;
+    line-height:1.6;
+  }
+
+  @media (max-width:720px){
+    body{ padding:16px; }
+    .readout{ min-width:0; width:100%; }
+  }
+</style>
+</head>
 <body>
-    <main>
-      <section>
-        <a href="https://deno.com/deploy">
-        </a>
-      <h1>
-        <p>
-          Hello, Deno!
-        </p>
-      </h1>
-      <p>
-        This little example is being served by <a href="https://deno.com/">Deno</a>.
-        You can run it locally or in porduction on <a href="https://deno.com/deploy">Deno Deploy</a> or other hosting platforms.
-      </p>
-      <ul>
-        <li>Run it locally with<code>deno task dev</code></li>
-        <li>Deploy it to <a href="https://deno.com/deploy">Deno Deploy</a> via the CLI by running<code>deno deploy</code></li>
-        <li>Run it locally and share it publically by running <code>deno deploy --connected</code></li>
-      </ul>
-    </section>
-      <hr>
-    <section>
-      <h2>What's next?</h2>
-      <p>
-        You can clone this example and deploy it to Deno Deploy in just a few clicks
-        <a href="https://app.deno.com/new?clone=https://github.com/denoland/examples&path=hello-world"><img src="https://deno.com/button" alt="Deploy on Deno"/></a>
-      </p>
-      <ul>
-        <li>
-          <a href="https://docs.deno.com/examples">More examples in the Deno Docs</a>
-        </li>
-        <li>
-          <a href="https://deno.com/deploy">Deno Deploy Early Access</a>
-        </li>
-      </ul>
-    </section>
-    </main>
-    <hr>
-    <footer>
-      <section>
-      <ul class="flex-btwn">
-        <li>
-          <a href="https://deno.com">BlueSky</a>
-        </li>
-        <li>
-          <a href="https://deno.com">Twitter</a>
-        </li>
-        <li>
-          <a href="https://deno.com">YouTube</a>
-        </li>
-        <li>
-          <a href="https://deno.com">Newsletter</a>
-        </li>
-        <li>
-          <a href="https://deno.com">Deno</a>
-        </li>
-      </ul>
-      </section>
-    </footer>
+
+  <div class="topbar">
+    <div class="wordmark">
+      <span class="mark">TUNER</span>
+      <span class="sub">bring your own playlist</span>
+    </div>
+    <div class="readout" id="readout">
+      <div class="num" id="readoutNum">--</div>
+      <div class="info">
+        <div class="name" id="readoutName">No channel loaded</div>
+        <div class="group" id="readoutGroup">&nbsp;</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="screen-col">
+      <div class="tv">
+        <div class="screen">
+          <div class="live-badge hidden" id="liveBadge"><span class="dot"></span>LIVE</div>
+          <video id="video" playsinline controls></video>
+          <div class="overlay" id="overlay">
+            <div class="glyph" id="overlayGlyph">NO SIGNAL</div>
+            <div class="msg" id="overlayMsg">Paste a stream link or playlist on the right to get started.</div>
+          </div>
+        </div>
+        <div class="tv-controls">
+          <button class="btn ghost" id="demoBtn">Try a demo stream</button>
+          <button class="btn ghost" id="fullscreenBtn" style="margin-left:8px;">Fullscreen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col">
+      <div class="panel">
+        <h2>Load a stream or playlist</h2>
+        <div class="field">
+          <input type="text" id="urlInput" placeholder="Paste a .m3u8 stream link or M3U playlist URL">
+        </div>
+        <div class="row-actions">
+          <button class="btn primary" id="loadBtn">Load</button>
+          <button class="btn ghost" id="clearBtn">Clear</button>
+        </div>
+        <button class="toggle-raw" id="toggleRaw">+ Paste raw M3U playlist text instead</button>
+        <div class="raw-block" id="rawBlock">
+          <textarea id="rawInput" placeholder="#EXTM3U
+#EXTINF:-1 group-title=&quot;Sports&quot;,Channel One
+https://example.com/channel1.m3u8"></textarea>
+          <div class="row-actions">
+            <button class="btn primary" id="parseBtn">Parse playlist</button>
+          </div>
+        </div>
+        <div class="hint">
+          Tip: bookmark this page with <code>?playlist=YOUR_M3U_URL</code> appended to the address and it will auto-load your channels every time — handy for a TV browser home-screen shortcut.
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Channels</h2>
+        <ul class="channel-list" id="channelList">
+          <li class="empty-state">No channels yet. Load a playlist above, or add a single stream link and press Load — it'll show up here as one channel.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const video = document.getElementById('video');
+  const urlInput = document.getElementById('urlInput');
+  const loadBtn = document.getElementById('loadBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const demoBtn = document.getElementById('demoBtn');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  const toggleRaw = document.getElementById('toggleRaw');
+  const rawBlock = document.getElementById('rawBlock');
+  const rawInput = document.getElementById('rawInput');
+  const parseBtn = document.getElementById('parseBtn');
+  const channelListEl = document.getElementById('channelList');
+  const overlay = document.getElementById('overlay');
+  const overlayGlyph = document.getElementById('overlayGlyph');
+  const overlayMsg = document.getElementById('overlayMsg');
+  const liveBadge = document.getElementById('liveBadge');
+  const readout = document.getElementById('readout');
+  const readoutNum = document.getElementById('readoutNum');
+  const readoutName = document.getElementById('readoutName');
+  const readoutGroup = document.getElementById('readoutGroup');
+
+  const DEMO_URL = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
+
+  let channels = [];
+  let currentIndex = -1;
+  let hlsInstance = null;
+
+  function destroyHls(){
+    if (hlsInstance){
+      try { hlsInstance.destroy(); } catch(e){}
+      hlsInstance = null;
+    }
+  }
+
+  function showOverlay(state, message){
+    overlay.classList.remove('hidden', 'state-error');
+    liveBadge.classList.add('hidden');
+    if (state === 'loading'){
+      overlayGlyph.textContent = 'TUNING IN';
+      overlayMsg.innerHTML = '<span class="spinner" style="display:inline-block;"></span>';
+    } else if (state === 'error'){
+      overlay.classList.add('state-error');
+      overlayGlyph.textContent = 'NO SIGNAL';
+      overlayMsg.textContent = message || 'Could not play this stream.';
+    } else if (state === 'idle'){
+      overlayGlyph.textContent = 'NO SIGNAL';
+      overlayMsg.textContent = message || 'Paste a stream link or playlist on the right to get started.';
+    }
+  }
+
+  function hideOverlay(){
+    overlay.classList.add('hidden');
+    liveBadge.classList.remove('hidden');
+  }
+
+  function describeHlsError(data){
+    if (data.type === 'networkError') {
+      return 'Could not reach the stream. The link may have expired, be private to an app/account, or the server may be blocking requests from a browser (CORS).';
+    }
+    if (data.type === 'mediaError') {
+      return 'The video format in this stream could not be decoded.';
+    }
+    return 'Playback failed for this stream.';
+  }
+
+  function loadIntoPlayer(url){
+    destroyHls();
+    showOverlay('loading');
+    video.removeAttribute('src');
+    video.load();
+
+    if (window.Hls && Hls.isSupported()) {
+      const hls = new Hls({ maxBufferLength: 30, enableWorker: true });
+      hlsInstance = hls;
+      hls.on(Hls.Events.ERROR, function(evt, data){
+        if (data.fatal) showOverlay('error', describeHlsError(data));
+      });
+      hls.on(Hls.Events.MANIFEST_PARSED, function(){
+        hideOverlay();
+        video.play().catch(function(){});
+      });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      video.addEventListener('loadedmetadata', function(){
+        hideOverlay();
+        video.play().catch(function(){});
+      }, { once:true });
+      video.addEventListener('error', function(){
+        showOverlay('error', 'This browser could not play the stream directly.');
+      }, { once:true });
+    } else {
+      showOverlay('error', 'This browser does not support HLS playback.');
+    }
+  }
+
+  function renderChannelList(){
+    channelListEl.innerHTML = '';
+    if (channels.length === 0) {
+      channelListEl.innerHTML = '<li class="empty-state">No channels yet. Load a playlist above, or add a single stream link and press Load — it\'ll show up here as one channel.</li>';
+      return;
+    }
+    channels.forEach(function(ch, i){
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.className = 'channel-item' + (i === currentIndex ? ' active' : '');
+      btn.setAttribute('tabindex', '0');
+
+      const num = document.createElement('span');
+      num.className = 'ch-num';
+      num.textContent = String(i + 1).padStart(2, '0');
+
+      const name = document.createElement('span');
+      name.className = 'ch-name';
+      name.textContent = ch.name;
+
+      btn.appendChild(num);
+      btn.appendChild(name);
+
+      if (ch.group) {
+        const group = document.createElement('span');
+        group.className = 'ch-group';
+        group.textContent = ch.group;
+        btn.appendChild(group);
+      }
+
+      btn.addEventListener('click', function(){ playChannel(i); });
+      li.appendChild(btn);
+      channelListEl.appendChild(li);
+    });
+  }
+
+  function updateReadout(ch, index){
+    readoutNum.textContent = String(index + 1).padStart(2, '0');
+    readoutName.textContent = ch.name;
+    readoutGroup.textContent = ch.group || '\u00A0';
+    readout.classList.remove('flicker');
+    void readout.offsetWidth;
+    readout.classList.add('flicker');
+  }
+
+  function playChannel(index){
+    const ch = channels[index];
+    if (!ch) return;
+    currentIndex = index;
+    updateReadout(ch, index);
+    renderChannelList();
+    loadIntoPlayer(ch.url);
+  }
+
+  function setChannels(list){
+    channels = list;
+    renderChannelList();
+  }
+
+  function parseM3U(text){
+    const lines = text.split(/\r?\n/);
+    const result = [];
+    let pending = null;
+    for (let raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      if (line.toUpperCase().startsWith('#EXTINF')) {
+        const colonIdx = line.indexOf(':');
+        const infoPart = colonIdx >= 0 ? line.substring(colonIdx + 1) : '';
+        const commaIdx = infoPart.lastIndexOf(',');
+        const attrs = commaIdx >= 0 ? infoPart.substring(0, commaIdx) : infoPart;
+        const name = commaIdx >= 0 ? infoPart.substring(commaIdx + 1).trim() : '';
+        const groupMatch = attrs.match(/group-title="([^"]*)"/i);
+        pending = {
+          name: name || ('Channel ' + (result.length + 1)),
+          group: groupMatch ? groupMatch[1] : ''
+        };
+      } else if (!line.startsWith('#')) {
+        if (pending) {
+          result.push({ name: pending.name, group: pending.group, url: line });
+          pending = null;
+        } else {
+          result.push({ name: 'Channel ' + (result.length + 1), group: '', url: line });
+        }
+      }
+    }
+    return result;
+  }
+
+  async function loadPlaylistOrStream(url){
+    if (!url) return;
+    showOverlay('loading');
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error('bad-response');
+      const text = await res.text();
+      if (text.indexOf('#EXTM3U') !== -1 || text.indexOf('#EXTINF') !== -1) {
+        const parsed = parseM3U(text);
+        if (parsed.length > 0) {
+          setChannels(parsed);
+          playChannel(0);
+          return;
+        }
+      }
+      // Fetched fine but doesn't look like a playlist — treat the URL itself as one direct stream.
+      setChannels([{ name: 'Custom stream', group: '', url: url }]);
+      playChannel(0);
+    } catch (err) {
+      // Could not fetch/parse as text (often a CORS restriction on the manifest).
+      // Fall back to handing the URL straight to the player, which may still work.
+      setChannels([{ name: 'Custom stream', group: '', url: url }]);
+      playChannel(0);
+    }
+  }
+
+  loadBtn.addEventListener('click', function(){
+    loadPlaylistOrStream(urlInput.value.trim());
+  });
+  urlInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') loadPlaylistOrStream(urlInput.value.trim());
+  });
+
+  clearBtn.addEventListener('click', function(){
+    channels = [];
+    currentIndex = -1;
+    destroyHls();
+    video.removeAttribute('src');
+    video.load();
+    renderChannelList();
+    readoutNum.textContent = '--';
+    readoutName.textContent = 'No channel loaded';
+    readoutGroup.textContent = '\u00A0';
+    showOverlay('idle');
+  });
+
+  demoBtn.addEventListener('click', function(){
+    urlInput.value = DEMO_URL;
+    loadPlaylistOrStream(DEMO_URL);
+  });
+
+  fullscreenBtn.addEventListener('click', function(){
+    if (video.requestFullscreen) video.requestFullscreen();
+    else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+  });
+
+  toggleRaw.addEventListener('click', function(){
+    const open = rawBlock.classList.toggle('open');
+    toggleRaw.textContent = (open ? '− Hide' : '+ Paste') + ' raw M3U playlist text instead';
+  });
+
+  parseBtn.addEventListener('click', function(){
+    const text = rawInput.value;
+    if (!text.trim()) return;
+    const parsed = parseM3U(text);
+    if (parsed.length > 0) {
+      setChannels(parsed);
+      playChannel(0);
+    } else {
+      showOverlay('error', 'Could not find any stream links in that text.');
+    }
+  });
+
+  // Arrow-key navigation for TV remotes / keyboards within the channel list
+  channelListEl.addEventListener('keydown', function(e){
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const items = Array.from(channelListEl.querySelectorAll('.channel-item'));
+    if (items.length === 0) return;
+    const idx = items.indexOf(document.activeElement);
+    if (idx === -1) return;
+    e.preventDefault();
+    const next = e.key === 'ArrowDown' ? Math.min(idx + 1, items.length - 1) : Math.max(idx - 1, 0);
+    items[next].focus();
+  });
+
+  // Auto-load from ?playlist= or ?url= query param — useful for a saved TV bookmark
+  const params = new URLSearchParams(location.search);
+  const auto = params.get('playlist') || params.get('url');
+  if (auto) {
+    urlInput.value = auto;
+    loadPlaylistOrStream(auto);
+  } else {
+    showOverlay('idle');
+  }
+})();
+</script>
 </body>
 </html>
