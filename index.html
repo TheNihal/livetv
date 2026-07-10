@@ -1134,7 +1134,7 @@
         loadPlaylistOrStream(auto);
       } else {
         // Fetch iptv.txt automatically
-        fetch('iptv.txt')
+        fetch('iptv.txt?v=' + Date.now(), { cache: 'no-store' })
           .then(res => {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             return res.text();
